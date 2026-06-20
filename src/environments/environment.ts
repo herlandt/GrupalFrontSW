@@ -2,5 +2,5 @@
 // environment.development.ts (ver fileReplacements en angular.json).
 export const environment = {
   production: true,
-  apiUrl: '/api/v1',
+  apiUrl: 'https://sjaskashdkashhdjash.space/api/v1',
 };
