@@ -62,8 +62,8 @@ function precioPositivo(control: AbstractControl): ValidationErrors | null {
         </form>
       </div>
 
-      <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table class="w-full text-sm">
+      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table class="w-full min-w-[40rem] text-sm">
           <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th class="px-4 py-3">Plan</th>

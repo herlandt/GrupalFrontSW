@@ -24,8 +24,8 @@ import { EticaService } from './etica.service';
         <p class="mb-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ e }}</p>
       }
 
-      <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table class="w-full text-sm">
+      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table class="w-full min-w-[44rem] text-sm">
           <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th class="px-4 py-3">Tipo</th>

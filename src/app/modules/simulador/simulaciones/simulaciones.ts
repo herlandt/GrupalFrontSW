@@ -119,8 +119,8 @@ const NIVELES: NivelDificultad[] = ['EXPLORACION', 'ESTANDAR', 'RIGUROSO'];
 
       <!-- CU-15: historial -->
       <h3 class="mb-3 text-sm font-semibold text-slate-700">Mis simulaciones</h3>
-      <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table class="w-full text-sm">
+      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table class="w-full min-w-[44rem] text-sm">
           <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th class="px-4 py-3">Inicio</th>

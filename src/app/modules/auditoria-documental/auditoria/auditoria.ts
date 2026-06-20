@@ -28,7 +28,7 @@ const CATEGORIAS: Categoria[] = ['COHERENCIA', 'NORMAS', 'SUGERENCIA'];
           <p class="mt-2 text-xs text-slate-400">{{ r.created_at | date: 'medium' }}</p>
         </div>
 
-        <div class="mb-4 flex gap-2">
+        <div class="mb-4 flex flex-wrap gap-2">
           <button
             (click)="filtrar(null)"
             [class.bg-slate-900]="filtro() === null"

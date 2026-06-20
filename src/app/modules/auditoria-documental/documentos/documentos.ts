@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnDestroy, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -69,45 +69,62 @@ import { Documento, DocumentosService, VersionDocumento } from './documentos.ser
           </div>
 
           @if (versionesPorDoc()[doc.id]; as versiones) {
-            <table class="mt-3 w-full text-sm">
-              <thead class="text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th class="py-2">Versión</th>
-                  <th class="py-2">Formato</th>
-                  <th class="py-2">Estado</th>
-                  <th class="py-2">Fecha</th>
-                  <th class="py-2">Informe</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (v of versiones; track v.id) {
-                  <tr class="border-t border-slate-100">
-                    <td class="py-2">v{{ v.numero_version }}</td>
-                    <td class="py-2">{{ v.formato }}</td>
-                    <td class="py-2 text-slate-600">{{ v.estado_analisis }}</td>
-                    <td class="py-2 text-slate-500">{{ v.created_at | date: 'short' }}</td>
-                    <td class="py-2">
-                      @if (v.estado_analisis === 'COMPLETADO') {
-                        <a
-                          [routerLink]="['/app/auditoria-documental/auditoria']"
-                          [queryParams]="{ version: v.id }"
-                          class="text-slate-600 hover:text-slate-900 hover:underline"
-                          >Ver informe</a
-                        >
-                      } @else {
-                        <button
-                          (click)="analizar(v, doc.id)"
-                          [disabled]="analizando()[v.id]"
-                          class="text-slate-600 hover:text-slate-900 hover:underline disabled:opacity-50"
-                        >
-                          {{ analizando()[v.id] ? 'Analizando…' : 'Analizar' }}
-                        </button>
-                      }
-                    </td>
+            <div class="mt-3 overflow-x-auto">
+              <table class="w-full min-w-[34rem] text-sm">
+                <thead class="text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    <th class="py-2">Versión</th>
+                    <th class="py-2">Formato</th>
+                    <th class="py-2">Estado</th>
+                    <th class="py-2">Fecha</th>
+                    <th class="py-2">Informe</th>
                   </tr>
-                }
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  @for (v of versiones; track v.id) {
+                    <tr class="border-t border-slate-100">
+                      <td class="py-2">v{{ v.numero_version }}</td>
+                      <td class="py-2">{{ v.formato }}</td>
+                      <td class="py-2 text-slate-600">{{ v.estado_analisis }}</td>
+                      <td class="py-2 text-slate-500">{{ v.created_at | date: 'short' }}</td>
+                      <td class="py-2">
+                        @switch (v.estado_analisis) {
+                          @case ('COMPLETADO') {
+                            <a
+                              [routerLink]="['/app/auditoria-documental/auditoria']"
+                              [queryParams]="{ version: v.id }"
+                              class="text-slate-600 hover:text-slate-900 hover:underline"
+                              >Ver informe</a
+                            >
+                          }
+                          @case ('EN_PROCESO') {
+                            <span class="inline-flex items-center gap-1 text-slate-500">
+                              <span class="h-2 w-2 animate-pulse rounded-full bg-amber-500"></span>
+                              Analizando…
+                            </span>
+                          }
+                          @default {
+                            <button
+                              (click)="analizar(v, doc.id)"
+                              [disabled]="analizando()[v.id]"
+                              class="text-slate-600 hover:text-slate-900 hover:underline disabled:opacity-50"
+                            >
+                              {{
+                                analizando()[v.id]
+                                  ? 'Enviando…'
+                                  : v.estado_analisis === 'ERROR'
+                                    ? 'Reintentar'
+                                    : 'Analizar'
+                              }}
+                            </button>
+                          }
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
             <!-- CU-09: subir nueva versión -->
             <input
               type="file"
@@ -125,9 +142,10 @@ import { Documento, DocumentosService, VersionDocumento } from './documentos.ser
     </section>
   `,
 })
-export class Documentos {
+export class Documentos implements OnDestroy {
   private readonly srv = inject(DocumentosService);
   private readonly auditoria = inject(AuditoriaService);
+  private poll: ReturnType<typeof setInterval> | null = null;
 
   protected readonly documentos = signal<Documento[]>([]);
   protected readonly versionesPorDoc = signal<Record<number, VersionDocumento[]>>({});
@@ -188,9 +206,10 @@ export class Documentos {
   }
 
   verVersiones(documentoId: number): void {
-    this.srv
-      .versiones(documentoId)
-      .subscribe((vs) => this.versionesPorDoc.update((m) => ({ ...m, [documentoId]: vs })));
+    this.srv.versiones(documentoId).subscribe((vs) => {
+      this.versionesPorDoc.update((m) => ({ ...m, [documentoId]: vs }));
+      this.gestionarPolling(); // si hay alguna EN_PROCESO, arranca el sondeo
+    });
   }
 
   onNuevaVersion(event: Event, documentoId: number): void {
@@ -209,23 +228,65 @@ export class Documentos {
 
   analizar(v: VersionDocumento, documentoId: number): void {
     this.analizando.update((m) => ({ ...m, [v.id]: true }));
-    // El análisis real con AWS (Comprehend + Titan) sobre el PDF completo es lento:
-    // avisamos para que no parezca colgado.
-    this.aviso.set('Analizando con IA (AWS). En documentos largos puede tardar 1-2 minutos…');
+    // El análisis corre EN SEGUNDO PLANO en el servidor: la petición vuelve enseguida y
+    // seguimos el progreso por sondeo. Puedes cambiar de pestaña; al volver verás el estado.
+    this.aviso.set(
+      'Análisis en segundo plano (puede tardar 1-2 min). Puedes seguir navegando; al volver verás el estado.',
+    );
     this.auditoria.analizar(v.id).subscribe({
       next: () => {
         this.analizando.update((m) => ({ ...m, [v.id]: false }));
-        this.aviso.set('Análisis completado.');
-        this.verVersiones(documentoId); // refresca el estado (-> COMPLETADO)
+        this.verVersiones(documentoId); // pasa a EN_PROCESO y arranca el sondeo
       },
       error: (e) => {
         this.analizando.update((m) => ({ ...m, [v.id]: false }));
         this.aviso.set(
           e.status === 502
             ? 'El servicio de análisis no está disponible. Inténtalo más tarde.'
-            : 'No se pudo analizar la versión.',
+            : 'No se pudo iniciar el análisis.',
         );
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    this.detenerPolling();
+  }
+
+  /** Mientras alguna versión esté EN_PROCESO, refresca su estado cada 4 s (sondeo). */
+  private gestionarPolling(): void {
+    if (this.hayEnProceso()) {
+      if (!this.poll) {
+        this.poll = setInterval(() => this.refrescarEnProceso(), 4000);
+      }
+    } else if (this.poll) {
+      this.detenerPolling();
+      this.aviso.set('Análisis finalizado. Revisa el estado en la tabla.');
+    }
+  }
+
+  private detenerPolling(): void {
+    if (this.poll) {
+      clearInterval(this.poll);
+      this.poll = null;
+    }
+  }
+
+  private hayEnProceso(): boolean {
+    return Object.values(this.versionesPorDoc()).some((vs) =>
+      vs.some((v) => v.estado_analisis === 'EN_PROCESO'),
+    );
+  }
+
+  private refrescarEnProceso(): void {
+    // Re-consulta solo los documentos que tengan alguna versión EN_PROCESO.
+    for (const [docId, vs] of Object.entries(this.versionesPorDoc())) {
+      if (vs.some((v) => v.estado_analisis === 'EN_PROCESO')) {
+        this.srv.versiones(+docId).subscribe((nvs) => {
+          this.versionesPorDoc.update((m) => ({ ...m, [+docId]: nvs }));
+          this.gestionarPolling(); // si ya no queda nada EN_PROCESO, se detiene
+        });
+      }
+    }
   }
 }

@@ -78,8 +78,8 @@ import { PagoHistorial, PagosService, SuscripcionEstado } from './pagos.service'
             </button>
           </div>
         </div>
-        <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <table class="w-full text-sm">
+        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table class="w-full min-w-[30rem] text-sm">
             <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr>
                 <th class="px-4 py-3">Fecha</th>

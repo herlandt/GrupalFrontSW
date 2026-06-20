@@ -14,7 +14,7 @@ import { UsuariosService } from './usuarios.service';
       <h2 class="mb-6 text-xl font-semibold text-slate-800">Mi perfil</h2>
 
       @if (usuario(); as u) {
-        <div class="rounded-xl border border-slate-200 bg-white p-6">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
           <div class="mb-6 flex items-center gap-4">
             @if (fotoUrl()) {
               <img [src]="fotoUrl()" alt="Foto" class="h-16 w-16 rounded-full object-cover" />

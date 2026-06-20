@@ -1,4 +1,13 @@
-import { Component, ElementRef, OnDestroy, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  OnDestroy,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { SimulacionesService } from '../simulaciones/simulaciones.service';
@@ -134,8 +143,8 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
         </div>
 
         <h3 class="mb-3 text-sm font-semibold text-slate-700">Historial por intervalo</h3>
-        <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <table class="w-full text-sm">
+        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table class="w-full min-w-[36rem] text-sm">
             <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr>
                 <th class="px-4 py-3">Postura</th>
@@ -173,11 +182,14 @@ export class Biometrico implements OnDestroy {
   private readonly simSrv = inject(SimulacionesService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly preview = viewChild<ElementRef<HTMLVideoElement>>('preview');
   private readonly audio = new AudioStreamer();
   private stream: MediaStream | null = null;
   private intervalo: ReturnType<typeof setInterval> | null = null;
-  private enVuelo = false;
+  private videoWs: WebSocket | null = null;
+  private cerrandoVideo = false; // distingue el cierre intencional del WS de uno inesperado
+  private ultimoRefresco = 0; // throttle de cargar() ante la ráfaga de mensajes de los WS
 
   protected readonly sesionId = Number(this.route.snapshot.queryParamMap.get('sesion'));
   protected readonly resumen = signal<ResumenBiometrico | null>(null);
@@ -199,17 +211,20 @@ export class Biometrico implements OnDestroy {
       this.cargar();
       // Solo abrimos cámara/micrófono si la defensa está EN CURSO; en una sesión ya
       // finalizada esta pantalla es solo lectura (no reabrir el hardware).
-      this.simSrv.detalle(this.sesionId).subscribe({
-        next: (s) => {
-          if (s.estado === 'EN_CURSO') {
-            this.enCurso.set(true);
-            this.activarCamara(); // el detalle llega tras el render: #preview ya existe
-          } else {
-            this.aviso.set('Sesión finalizada: mostrando solo las métricas (sin cámara).');
-          }
-        },
-        error: (e) => this.aviso.set(this.mensajeError(e)),
-      });
+      this.simSrv
+        .detalle(this.sesionId)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (s) => {
+            if (s.estado === 'EN_CURSO') {
+              this.enCurso.set(true);
+              this.activarCamara(); // el detalle llega tras el render: #preview ya existe
+            } else {
+              this.aviso.set('Sesión finalizada: mostrando solo las métricas (sin cámara).');
+            }
+          },
+          error: (e) => this.aviso.set(this.mensajeError(e)),
+        });
     }
   }
 
@@ -219,20 +234,35 @@ export class Biometrico implements OnDestroy {
 
   private cargar(): void {
     this.cargando.set(true);
-    this.srv.resumen(this.sesionId).subscribe({
-      next: (r) => this.resumen.set(r),
-      error: (e) => this.aviso.set(this.mensajeError(e)),
-    });
-    this.srv.metricas(this.sesionId).subscribe({
-      next: (m) => {
-        this.metricas.set(m);
-        this.cargando.set(false);
-      },
-      error: (e) => {
-        this.cargando.set(false);
-        this.aviso.set(this.mensajeError(e));
-      },
-    });
+    this.srv
+      .resumen(this.sesionId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => this.resumen.set(r),
+        error: (e) => this.aviso.set(this.mensajeError(e)),
+      });
+    this.srv
+      .metricas(this.sesionId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (m) => {
+          this.metricas.set(m);
+          this.cargando.set(false);
+        },
+        error: (e) => {
+          this.cargando.set(false);
+          this.aviso.set(this.mensajeError(e));
+        },
+      });
+  }
+
+  /** Refresco ACOTADO (máx. 1 cada 1.5 s): los WS de audio/video emiten varias veces por
+   *  segundo; sin throttle cada mensaje dispararía 2 GET (resumen+métricas) → tormenta. */
+  private refrescar(): void {
+    const ahora = Date.now();
+    if (ahora - this.ultimoRefresco < 1500) return;
+    this.ultimoRefresco = ahora;
+    this.cargar();
   }
 
   async activarCamara(): Promise<void> {
@@ -246,7 +276,8 @@ export class Biometrico implements OnDestroy {
       }
       this.camara.set(true);
       this.capturas.set(0);
-      // Análisis de video continuo: un frame cada INTERVALO_MS mientras dura la defensa.
+      // Análisis de video por WebSocket: un frame cada INTERVALO_MS → AWS Rekognition.
+      this.abrirVideoWs();
       this.capturarFrame();
       this.intervalo = setInterval(() => this.capturarFrame(), INTERVALO_MS);
       // Análisis de voz continuo (RF-05) por WebSocket → AWS Transcribe Streaming.
@@ -294,35 +325,53 @@ export class Biometrico implements OnDestroy {
     if (m.transcripcion) {
       this.transcripcion.update((t) => `${t ?? ''} ${m.transcripcion}`.trim().slice(-400));
     }
-    this.cargar(); // refresca tabla + resumen con la nueva métrica de voz
+    this.refrescar(); // refresca tabla + resumen con la nueva métrica de voz (throttled)
+  }
+
+  /** Abre el WebSocket de video → AWS Rekognition (mismo transporte que el audio). */
+  private abrirVideoWs(): void {
+    this.cerrandoVideo = false; // nuevo socket: un cierre ahora sí sería inesperado
+    const ws = new WebSocket(this.srv.videoWsUrl(this.sesionId));
+    ws.binaryType = 'arraybuffer';
+    ws.onmessage = (ev) => {
+      try {
+        const m = JSON.parse(ev.data as string) as { error?: string };
+        if (m.error) {
+          this.aviso.set('Análisis de video: ' + m.error);
+          return;
+        }
+        this.capturas.update((n) => n + 1);
+        this.refrescar(); // refresca tabla + resumen con la nueva métrica de video (throttled)
+      } catch {
+        /* ignora frames no-JSON */
+      }
+    };
+    ws.onerror = () => this.aviso.set('No se pudo conectar el análisis de video.');
+    ws.onclose = () => {
+      this.detenerCaptura(); // siempre paramos el bucle de captura
+      if (!this.cerrandoVideo) {
+        // Cierre INESPERADO (red/token/backend): apagamos cámara y micrófono para no dejar
+        // el hardware encendido con la UI diciendo "analizando" sin análisis real.
+        this.aviso.set('El análisis de video se desconectó; se detuvo la cámara.');
+        this.detener();
+      }
+    };
+    this.videoWs = ws;
   }
 
   private capturarFrame(): void {
     const video = this.preview()?.nativeElement;
-    if (!video || !video.videoWidth || this.enVuelo) return;
+    if (!video || !video.videoWidth || this.videoWs?.readyState !== WebSocket.OPEN) return;
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d')?.drawImage(video, 0, 0);
-    this.enVuelo = true;
+    // Envía el frame JPEG por WebSocket; Rekognition lo analiza y responde la métrica.
     canvas.toBlob(
       (blob) => {
-        if (!blob) {
-          this.enVuelo = false;
-          return;
+        if (blob && this.videoWs?.readyState === WebSocket.OPEN) {
+          void blob.arrayBuffer().then((buf) => this.videoWs?.send(buf));
         }
-        this.srv.analizarFrame(this.sesionId, blob).subscribe({
-          next: () => {
-            this.enVuelo = false;
-            this.capturas.update((n) => n + 1);
-            this.cargar();
-          },
-          error: (e) => {
-            this.enVuelo = false;
-            this.detenerCaptura(); // detiene solo el bucle de video ante un error (402/404/502…)
-            this.aviso.set(this.mensajeError(e));
-          },
-        });
       },
       'image/jpeg',
       0.8,
@@ -332,12 +381,16 @@ export class Biometrico implements OnDestroy {
   /** Finaliza la SIMULACIÓN (no solo apaga la cámara): cierra la sesión y vuelve al listado. */
   finalizarDefensa(): void {
     this.detener();
+    this.enCurso.set(false); // cerrada: no debe reaparecer el botón "Activar cámara"
     this.finalizando.set(true);
-    this.simSrv.finalizar(this.sesionId).subscribe({
-      next: () => this.router.navigate(['/app/simulador']),
-      // 409 si ya estaba cerrada: igualmente salimos al listado.
-      error: () => this.router.navigate(['/app/simulador']),
-    });
+    this.simSrv
+      .finalizar(this.sesionId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.router.navigate(['/app/simulador']),
+        // 409 si ya estaba cerrada: igualmente salimos al listado.
+        error: () => this.router.navigate(['/app/simulador']),
+      });
   }
 
   /** Detiene el bucle de captura de video (sin tocar audio ni cerrar la cámara). */
@@ -350,9 +403,25 @@ export class Biometrico implements OnDestroy {
 
   /** Apaga todo: captura de video, micrófono/WebSocket y la cámara. */
   private detener(): void {
+    this.cerrandoVideo = true; // cierre intencional: el onclose no debe re-disparar detener()
     this.detenerCaptura();
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
+    if (this.videoWs && this.videoWs.readyState === WebSocket.OPEN) {
+      try {
+        this.videoWs.send('stop'); // cierre limpio del stream de video en el backend
+      } catch {
+        /* noop */
+      }
+    }
+    if (this.videoWs) {
+      // Anula los handlers antes de cerrar: ningún callback debe tocar el componente tras esto.
+      this.videoWs.onmessage = null;
+      this.videoWs.onclose = null;
+      this.videoWs.onerror = null;
+    }
+    this.videoWs?.close();
+    this.videoWs = null;
     this.audio.detener();
     this.audioActivo.set(false);
     this.camara.set(false);
