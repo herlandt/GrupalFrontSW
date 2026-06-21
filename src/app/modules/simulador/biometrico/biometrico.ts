@@ -3,6 +3,7 @@ import {
   DestroyRef,
   ElementRef,
   OnDestroy,
+  computed,
   inject,
   signal,
   viewChild,
@@ -21,7 +22,7 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
 @Component({
   selector: 'app-biometrico',
   template: `
-    <section class="max-w-3xl">
+    <section class="max-w-5xl">
       <h2 class="mb-4 text-xl font-semibold text-slate-800">Análisis de la defensa (ExpoLens)</h2>
 
       @if (aviso(); as a) {
@@ -63,115 +64,145 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
           </div>
         }
 
-        <!-- Cámara + micrófono: análisis facial y de voz continuo (RF-03/04/05) -->
-        <div class="mb-6 rounded-xl border border-slate-200 bg-white p-5">
-          <video
-            #preview
-            autoplay
-            playsinline
-            muted
-            [hidden]="!camara()"
-            class="mb-3 w-full max-w-sm rounded-lg border border-slate-200 bg-slate-900"
-          ></video>
+        <!-- En vivo: cámara/controles a la izquierda, feed de lecturas (recientes arriba) a la derecha -->
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <!-- Cámara + micrófono: análisis facial y de voz continuo (RF-03/04/05) -->
+          <div class="rounded-xl border border-slate-200 bg-white p-5">
+            <video
+              #preview
+              autoplay
+              playsinline
+              muted
+              [hidden]="!camara()"
+              class="mb-3 w-full max-w-sm rounded-lg border border-slate-200 bg-slate-900"
+            ></video>
 
-          <div class="flex flex-wrap items-center gap-3">
-            @if (!camara() && enCurso()) {
-              <button
-                (click)="activarCamara()"
-                class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-              >
-                Activar cámara y micrófono
-              </button>
-            } @else if (camara()) {
-              <span class="flex items-center gap-2 text-sm font-medium text-emerald-700">
-                <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></span>
-                Analizando en vivo · {{ capturas() }} capturas
-              </span>
-              @if (audioActivo()) {
-                <span class="flex items-center gap-1 text-xs font-medium text-sky-700">
-                  <span class="h-2 w-2 animate-pulse rounded-full bg-sky-500"></span>
-                  voz
+            <div class="flex flex-wrap items-center gap-3">
+              @if (!camara() && enCurso()) {
+                <button
+                  (click)="activarCamara()"
+                  class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Activar cámara y micrófono
+                </button>
+              } @else if (camara()) {
+                <span class="flex items-center gap-2 text-sm font-medium text-emerald-700">
+                  <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></span>
+                  Analizando en vivo · {{ capturas() }} capturas
                 </span>
+                @if (audioActivo()) {
+                  <span class="flex items-center gap-1 text-xs font-medium text-sky-700">
+                    <span class="h-2 w-2 animate-pulse rounded-full bg-sky-500"></span>
+                    voz
+                  </span>
+                }
+                <button
+                  (click)="finalizarDefensa()"
+                  [disabled]="finalizando()"
+                  class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {{ finalizando() ? 'Finalizando…' : 'Finalizar simulación' }}
+                </button>
               }
-              <button
-                (click)="finalizarDefensa()"
-                [disabled]="finalizando()"
-                class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
-              >
-                {{ finalizando() ? 'Finalizando…' : 'Finalizar simulación' }}
-              </button>
+            </div>
+
+            @if (camara() && microfonos().length) {
+              <div class="mt-3 max-w-sm">
+                <label class="mb-1 block text-xs text-slate-500"
+                  >Micrófono (prueba otro si el nivel queda en 0)</label
+                >
+                <select
+                  (change)="cambiarMicrofono($event)"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  @for (mic of microfonos(); track mic.id) {
+                    <option [value]="mic.id" [selected]="mic.id === micActual()">
+                      {{ mic.label }}
+                    </option>
+                  }
+                </select>
+              </div>
+            }
+
+            @if (camara()) {
+              <div class="mt-3 max-w-sm">
+                <p class="mb-1 text-xs text-slate-500">
+                  Nivel de micrófono — habla para ver si capta ({{ nivelAudio() }})
+                </p>
+                <div class="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    class="h-full rounded-full bg-emerald-500 transition-[width] duration-100"
+                    [style.width.%]="nivelAudio()"
+                  ></div>
+                </div>
+              </div>
+            }
+
+            @if (transcripcion(); as t) {
+              <p class="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm italic text-slate-600">
+                🎙️ “{{ t }}”
+              </p>
             }
           </div>
 
-          @if (camara() && microfonos().length) {
-            <div class="mt-3 max-w-sm">
-              <label class="mb-1 block text-xs text-slate-500"
-                >Micrófono (prueba otro si el nivel queda en 0)</label
-              >
-              <select
-                (change)="cambiarMicrofono($event)"
-                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              >
-                @for (mic of microfonos(); track mic.id) {
-                  <option [value]="mic.id" [selected]="mic.id === micActual()">
-                    {{ mic.label }}
-                  </option>
-                }
-              </select>
+          <!-- Feed por intervalo: FIFO, la lectura MÁS RECIENTE arriba (sin scroll al fondo) -->
+          <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-slate-700">Lecturas en vivo</h3>
+              <span class="text-xs text-slate-400">recientes arriba</span>
             </div>
-          }
-
-          @if (camara()) {
-            <div class="mt-3 max-w-sm">
-              <p class="mb-1 text-xs text-slate-500">
-                Nivel de micrófono — habla para ver si capta ({{ nivelAudio() }})
-              </p>
-              <div class="h-3 w-full overflow-hidden rounded-full bg-slate-200">
-                <div
-                  class="h-full rounded-full bg-emerald-500 transition-[width] duration-100"
-                  [style.width.%]="nivelAudio()"
-                ></div>
-              </div>
-            </div>
-          }
-
-          @if (transcripcion(); as t) {
-            <p class="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm italic text-slate-600">
-              🎙️ “{{ t }}”
-            </p>
-          }
-        </div>
-
-        <h3 class="mb-3 text-sm font-semibold text-slate-700">Historial por intervalo</h3>
-        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table class="w-full min-w-[36rem] text-sm">
-            <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr>
-                <th class="px-4 py-3">Postura</th>
-                <th class="px-4 py-3">Contacto visual</th>
-                <th class="px-4 py-3">Muletillas</th>
-                <th class="px-4 py-3">Pausas</th>
-                <th class="px-4 py-3">Ritmo</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (m of metricas(); track m.id) {
-                <tr class="border-t border-slate-100">
-                  <td class="px-4 py-3 text-slate-700">{{ m.postura_score ?? '—' }}</td>
-                  <td class="px-4 py-3 text-slate-700">{{ m.contacto_visual_pct ?? '—' }}</td>
-                  <td class="px-4 py-3 text-slate-700">{{ m.muletillas_conteo }}</td>
-                  <td class="px-4 py-3 text-slate-700">{{ m.pausas_largas_conteo }}</td>
-                  <td class="px-4 py-3 text-slate-700">{{ m.ritmo_wpm ?? '—' }}</td>
-                </tr>
+            <ul class="flex max-h-[30rem] flex-col gap-2 overflow-y-auto pr-1">
+              @for (m of metricasRecientes(); track m.id; let i = $index, primero = $first) {
+                <li
+                  class="rounded-lg border px-3 py-2"
+                  [class.border-emerald-300]="primero"
+                  [class.bg-emerald-50]="primero"
+                  [class.border-slate-100]="!primero"
+                  [class.bg-white]="!primero"
+                >
+                  <div class="mb-1 flex items-center justify-between text-xs">
+                    <span class="font-medium text-slate-500"
+                      >Intervalo {{ metricasRecientes().length - i }}</span
+                    >
+                    @if (primero) {
+                      <span
+                        class="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700"
+                        >más reciente</span
+                      >
+                    }
+                  </div>
+                  <div class="grid grid-cols-5 gap-1 text-center">
+                    <div>
+                      <p class="text-[11px] text-slate-400">Postura</p>
+                      <p class="text-sm font-medium text-slate-700">{{ m.postura_score ?? '—' }}</p>
+                    </div>
+                    <div>
+                      <p class="text-[11px] text-slate-400">Visual</p>
+                      <p class="text-sm font-medium text-slate-700">
+                        {{ m.contacto_visual_pct ?? '—' }}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="text-[11px] text-slate-400">Muletillas</p>
+                      <p class="text-sm font-medium text-slate-700">{{ m.muletillas_conteo }}</p>
+                    </div>
+                    <div>
+                      <p class="text-[11px] text-slate-400">Pausas</p>
+                      <p class="text-sm font-medium text-slate-700">{{ m.pausas_largas_conteo }}</p>
+                    </div>
+                    <div>
+                      <p class="text-[11px] text-slate-400">Ritmo</p>
+                      <p class="text-sm font-medium text-slate-700">{{ m.ritmo_wpm ?? '—' }}</p>
+                    </div>
+                  </div>
+                </li>
               } @empty {
-                <tr>
-                  <td colspan="5" class="px-4 py-6 text-center text-slate-400">
-                    {{ cargando() ? 'Cargando…' : 'Activa la cámara para empezar a analizar.' }}
-                  </td>
-                </tr>
+                <li class="py-6 text-center text-sm text-slate-400">
+                  {{ cargando() ? 'Cargando…' : 'Activa la cámara para empezar a analizar.' }}
+                </li>
               }
-            </tbody>
-          </table>
+            </ul>
+          </div>
         </div>
       }
     </section>
@@ -194,6 +225,10 @@ export class Biometrico implements OnDestroy {
   protected readonly sesionId = Number(this.route.snapshot.queryParamMap.get('sesion'));
   protected readonly resumen = signal<ResumenBiometrico | null>(null);
   protected readonly metricas = signal<MetricaBiometrica[]>([]);
+  /** Métricas de la MÁS RECIENTE a la más antigua: alimenta el feed lateral (FIFO en la UI). */
+  protected readonly metricasRecientes = computed(() =>
+    [...this.metricas()].sort((a, b) => b.id - a.id),
+  );
   protected readonly camara = signal(false);
   protected readonly audioActivo = signal(false);
   protected readonly enCurso = signal(false);
