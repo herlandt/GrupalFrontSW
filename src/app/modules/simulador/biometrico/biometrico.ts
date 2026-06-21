@@ -88,7 +88,7 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
               } @else if (camara()) {
                 <span class="flex items-center gap-2 text-sm font-medium text-emerald-700">
                   <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></span>
-                  Analizando en vivo · {{ capturas() }} capturas
+                  Analizando en vivo · {{ resumen()?.intervalos ?? 0 }} lecturas
                 </span>
                 @if (audioActivo()) {
                   <span class="flex items-center gap-1 text-xs font-medium text-sky-700">
@@ -127,7 +127,12 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
             @if (camara()) {
               <div class="mt-3 max-w-sm">
                 <p class="mb-1 text-xs text-slate-500">
-                  Nivel de micrófono — habla para ver si capta ({{ nivelAudio() }})
+                  Nivel de micrófono
+                  @if (nivelAudio() > 8) {
+                    <span class="font-medium text-emerald-600">· captando voz ✓</span>
+                  } @else {
+                    <span>— habla para probar</span>
+                  }
                 </p>
                 <div class="h-3 w-full overflow-hidden rounded-full bg-slate-200">
                   <div
@@ -227,6 +232,7 @@ export class Biometrico implements OnDestroy {
   private readonly audio = new AudioStreamer();
   private stream: MediaStream | null = null;
   private intervalo: ReturnType<typeof setInterval> | null = null;
+  private poll: ReturnType<typeof setInterval> | null = null; // refresco periódico del feed
   private videoWs: WebSocket | null = null;
   private cerrandoVideo = false; // distingue el cierre intencional del WS de uno inesperado
   private ultimoRefresco = 0; // throttle de cargar() ante la ráfaga de mensajes de los WS
@@ -326,6 +332,9 @@ export class Biometrico implements OnDestroy {
       this.intervalo = setInterval(() => this.capturarFrame(), INTERVALO_MS);
       // Análisis de voz continuo (RF-05) por WebSocket → AWS Transcribe Streaming.
       this.iniciarAudio();
+      // Refresco PERIÓDICO independiente del WS: el feed y los contadores se actualizan
+      // desde la BD (fuente de verdad) aunque algún mensaje del WebSocket no llegue.
+      this.poll = setInterval(() => this.cargar(), 2500);
     } catch {
       this.aviso.set('No se pudo acceder a la cámara. Revisa los permisos del navegador.');
     }
@@ -449,6 +458,10 @@ export class Biometrico implements OnDestroy {
   private detener(): void {
     this.cerrandoVideo = true; // cierre intencional: el onclose no debe re-disparar detener()
     this.detenerCaptura();
+    if (this.poll) {
+      clearInterval(this.poll);
+      this.poll = null;
+    }
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     if (this.videoWs && this.videoWs.readyState === WebSocket.OPEN) {
