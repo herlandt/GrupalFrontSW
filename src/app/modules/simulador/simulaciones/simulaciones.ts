@@ -54,7 +54,7 @@ const NIVELES: NivelDificultad[] = ['EXPLORACION', 'ESTANDAR', 'RIGUROSO'];
               ⚠️ Caso límite — revisión humana sugerida
             </p>
           }
-          <div class="mt-3 grid grid-cols-3 gap-3 text-sm">
+          <div class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div>
               <p class="text-xs text-slate-500">Oratoria</p>
               <p class="text-slate-800">{{ r.oratoria_score ?? '—' }}</p>
@@ -64,10 +64,17 @@ const NIVELES: NivelDificultad[] = ['EXPLORACION', 'ESTANDAR', 'RIGUROSO'];
               <p class="text-slate-800">{{ r.comunicacion_no_verbal_score ?? '—' }}</p>
             </div>
             <div>
-              <p class="text-xs text-slate-500">Dominio</p>
+              <p class="text-xs text-slate-500">Dominio *</p>
               <p class="text-slate-800">{{ r.dominio_score ?? '—' }}</p>
             </div>
+            <div>
+              <p class="text-xs text-slate-500">Coherencia c/ tu doc</p>
+              <p class="text-slate-800">{{ r.coherencia_documento_score ?? '—' }}</p>
+            </div>
           </div>
+          <p class="mt-1 text-xs text-slate-400">
+            * Dominio (preguntas del tribunal) es informativo; no afecta el nivel de defensa.
+          </p>
           @if (r.resumen) {
             <p class="mt-3 text-sm text-slate-600">{{ r.resumen }}</p>
           }

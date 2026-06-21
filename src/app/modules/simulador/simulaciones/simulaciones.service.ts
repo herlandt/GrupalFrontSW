@@ -26,6 +26,7 @@ export interface ResultadoSimulacion {
   oratoria_score: number | null;
   comunicacion_no_verbal_score: number | null;
   dominio_score: number | null;
+  coherencia_documento_score: number | null; // 0..100: discurso vs documento
   confianza: number | null;
   resumen: string | null;
   created_at: string;
