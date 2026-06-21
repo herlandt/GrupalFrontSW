@@ -22,6 +22,7 @@ export class AudioStreamer {
   private procesador: ScriptProcessorNode | null = null;
   private ws: WebSocket | null = null;
   private cerrando = false;
+  private nivelPico = 0; // medidor con caída suave (peak-hold), para no parpadear a 0
 
   /** Resuelve cuando el WebSocket está CONECTADO. Rechaza si el handshake falla (así un
    *  rechazo del backend deja de ser silencioso). Tras conectar, los cierres/errores se
@@ -99,7 +100,11 @@ export class AudioStreamer {
         const rms = Math.sqrt(suma / entrada.length);
         // Escala perceptual: la voz normal tiene RMS bajo y con escala lineal queda en ~0.
         // sqrt(rms) hace visible el audio presente aunque sea de volumen bajo.
-        onNivel(Math.min(100, Math.round(Math.sqrt(rms) * 280)));
+        const instante = Math.min(100, Math.round(Math.sqrt(rms) * 280));
+        // Peak-hold: sube al instante y baja ~15 % por frame (~85 ms). Evita que el número
+        // "parpadee" a 0 entre sílabas, que hacía creer que el micrófono no captaba.
+        this.nivelPico = Math.max(instante, Math.round(this.nivelPico * 0.85));
+        onNivel(this.nivelPico);
       }
       if (this.ws?.readyState !== WebSocket.OPEN) return;
       this.ws.send(this.aPcm16(entrada, tasaEntrada));

@@ -138,10 +138,19 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
               </div>
             }
 
-            @if (transcripcion(); as t) {
-              <p class="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm italic text-slate-600">
-                🎙️ “{{ t }}”
-              </p>
+            @if (camara()) {
+              <div class="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                <span class="mb-0.5 block text-xs font-medium text-slate-400"
+                  >Transcripción en vivo</span
+                >
+                @if (transcripcion(); as t) {
+                  <span class="italic">🎙️ “{{ t }}”</span>
+                } @else {
+                  <span class="italic text-slate-400"
+                    >Escuchando… habla para ver la transcripción (puede tardar 1-2 s).</span
+                  >
+                }
+              </div>
             }
           </div>
 
