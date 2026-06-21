@@ -13,6 +13,7 @@ export interface MetricaBiometrica {
   ritmo_wpm: number | null;
   pausas_largas_conteo: number;
   contacto_visual_pct: string | null;
+  transcripcion_texto: string; // texto reconocido (audio); vacío en frames de video
   momento: string;
   created_at: string;
 }

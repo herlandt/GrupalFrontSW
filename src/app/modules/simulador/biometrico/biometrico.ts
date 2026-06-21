@@ -88,7 +88,7 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
               } @else if (camara()) {
                 <span class="flex items-center gap-2 text-sm font-medium text-emerald-700">
                   <span class="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></span>
-                  Analizando en vivo · {{ resumen()?.intervalos ?? 0 }} lecturas
+                  Analizando en vivo · {{ metricas().length }} lecturas
                 </span>
                 @if (audioActivo()) {
                   <span class="flex items-center gap-1 text-xs font-medium text-sky-700">
@@ -148,7 +148,7 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
                 <span class="mb-0.5 block text-xs font-medium text-slate-400"
                   >Transcripción en vivo</span
                 >
-                @if (transcripcion(); as t) {
+                @if (transcripcionVivo(); as t) {
                   <span class="italic">🎙️ “{{ t }}”</span>
                 } @else {
                   <span class="italic text-slate-400"
@@ -244,6 +244,18 @@ export class Biometrico implements OnDestroy {
   protected readonly metricasRecientes = computed(() =>
     [...this.metricas()].sort((a, b) => b.id - a.id),
   );
+  /** Transcripción en vivo armada desde los datos GUARDADOS (orden cronológico): es fiable
+   *  aunque algún mensaje del WebSocket no llegue, porque se refresca por polling. */
+  protected readonly transcripcionVivo = computed(() => {
+    const txt = [...this.metricas()]
+      .sort((a, b) => a.id - b.id)
+      .map((m) => (m.transcripcion_texto ?? '').trim())
+      .filter((t) => t.length > 0)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return txt.length > 500 ? '…' + txt.slice(-500) : txt;
+  });
   protected readonly camara = signal(false);
   protected readonly audioActivo = signal(false);
   protected readonly enCurso = signal(false);

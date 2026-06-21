@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import {
@@ -30,7 +30,7 @@ const NIVELES: NivelDificultad[] = ['EXPLORACION', 'ESTANDAR', 'RIGUROSO'];
 
       <!-- CU-14 (Fase 4): resultado y nivel de defensa de la IA evaluadora -->
       @if (resultado(); as r) {
-        <div class="mb-6 rounded-xl border border-slate-200 bg-white p-5">
+        <div #resultadoCard class="mb-6 rounded-xl border-2 border-emerald-300 bg-white p-5">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="text-sm font-semibold text-slate-700">Resultado de la simulación</h3>
             <button
@@ -203,6 +203,7 @@ export class Simulaciones {
   protected readonly iniciando = signal(false);
   protected readonly aviso = signal<string | null>(null);
   protected readonly resultado = signal<ResultadoSimulacion | null>(null);
+  private readonly resultadoCard = viewChild<ElementRef<HTMLDivElement>>('resultadoCard');
 
   constructor() {
     this.docs.listar().subscribe((d) => this.documentos.set(d));
@@ -269,6 +270,16 @@ export class Simulaciones {
       next: (r) => {
         this.resultado.set(r);
         this.recargar();
+        // La tarjeta se renderiza ARRIBA y el botón está abajo en la tabla: la traemos a la
+        // vista para que el usuario vea el resultado (antes parecía que "no hacía nada").
+        setTimeout(
+          () =>
+            this.resultadoCard()?.nativeElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start',
+            }),
+          50,
+        );
       },
       error: (e) =>
         this.aviso.set(
