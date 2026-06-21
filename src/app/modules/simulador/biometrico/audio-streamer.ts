@@ -140,13 +140,24 @@ export class AudioStreamer {
     this.ws = null;
   }
 
-  /** Re-muestrea a 16 kHz (decimación) y convierte Float32 [-1,1] a PCM Int16 little-endian. */
+  /** Re-muestrea a 16 kHz y convierte Float32 [-1,1] a PCM Int16 little-endian.
+   *  Promedia cada ventana de muestras de origen (filtro anti-aliasing simple) en vez de
+   *  tomar 1 de cada N (decimación pura): la decimación mete aliasing que distorsiona la
+   *  voz y degrada el reconocimiento de AWS Transcribe. */
   private aPcm16(muestras: Float32Array, tasaEntrada: number): ArrayBuffer {
     const ratio = tasaEntrada / TASA_DESTINO;
     const longitud = Math.floor(muestras.length / ratio);
     const vista = new DataView(new ArrayBuffer(longitud * 2));
     for (let i = 0; i < longitud; i++) {
-      const muestra = muestras[Math.floor(i * ratio)] ?? 0;
+      const inicio = Math.floor(i * ratio);
+      const fin = Math.min(muestras.length, Math.floor((i + 1) * ratio));
+      let suma = 0;
+      let n = 0;
+      for (let j = inicio; j < fin; j++) {
+        suma += muestras[j] ?? 0;
+        n++;
+      }
+      const muestra = n > 0 ? suma / n : (muestras[inicio] ?? 0);
       const acotada = Math.max(-1, Math.min(1, muestra));
       vista.setInt16(i * 2, acotada < 0 ? acotada * 0x8000 : acotada * 0x7fff, true);
     }
