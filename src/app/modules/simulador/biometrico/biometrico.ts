@@ -344,9 +344,9 @@ export class Biometrico implements OnDestroy {
       this.intervalo = setInterval(() => this.capturarFrame(), INTERVALO_MS);
       // Análisis de voz continuo (RF-05) por WebSocket → AWS Transcribe Streaming.
       this.iniciarAudio();
-      // Refresco PERIÓDICO independiente del WS: el feed y los contadores se actualizan
-      // desde la BD (fuente de verdad) aunque algún mensaje del WebSocket no llegue.
-      this.poll = setInterval(() => this.cargar(), 2500);
+      // Refresco PERIÓDICO independiente del WS: el feed, los contadores y la transcripción
+      // se actualizan desde la BD (fuente de verdad) ~cada 1.5 s aunque el WebSocket falle.
+      this.poll = setInterval(() => this.cargar(), 1500);
     } catch {
       this.aviso.set('No se pudo acceder a la cámara. Revisa los permisos del navegador.');
     }
