@@ -97,11 +97,10 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
                   </span>
                 }
                 <button
-                  (click)="finalizarDefensa()"
-                  [disabled]="finalizando()"
-                  class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                  (click)="terminarPresentacion()"
+                  class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
                 >
-                  {{ finalizando() ? 'Finalizando…' : 'Finalizar simulación' }}
+                  Terminar presentación →
                 </button>
               }
             </div>
@@ -264,7 +263,6 @@ export class Biometrico implements OnDestroy {
   protected readonly micActual = signal('');
   protected readonly capturas = signal(0);
   protected readonly cargando = signal(false);
-  protected readonly finalizando = signal(false);
   protected readonly transcripcion = signal<string | null>(null);
   protected readonly aviso = signal<string | null>(null);
 
@@ -443,19 +441,14 @@ export class Biometrico implements OnDestroy {
     );
   }
 
-  /** Finaliza la SIMULACIÓN (no solo apaga la cámara): cierra la sesión y vuelve al listado. */
-  finalizarDefensa(): void {
+  /** Termina la PRESENTACIÓN (no cierra la sesión): apaga cámara/mic y pasa al tribunal por voz.
+   *  La sesión sigue EN_CURSO; el resultado se genera al terminar el tribunal. */
+  terminarPresentacion(): void {
     this.detener();
-    this.enCurso.set(false); // cerrada: no debe reaparecer el botón "Activar cámara"
-    this.finalizando.set(true);
-    this.simSrv
-      .finalizar(this.sesionId)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => this.router.navigate(['/app/simulador']),
-        // 409 si ya estaba cerrada: igualmente salimos al listado.
-        error: () => this.router.navigate(['/app/simulador']),
-      });
+    this.enCurso.set(false); // ya no debe reaparecer el botón "Activar cámara"
+    this.router.navigate(['/app/simulador/tribunal-voz'], {
+      queryParams: { sesion: this.sesionId },
+    });
   }
 
   /** Detiene el bucle de captura de video (sin tocar audio ni cerrar la cámara). */

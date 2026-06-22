@@ -47,4 +47,9 @@ export class TribunalService {
   evaluacion(preguntaId: number): Observable<Evaluacion> {
     return this.api.get<Evaluacion>(`/tribunal/preguntas/${preguntaId}/evaluacion`);
   }
+
+  /** Audio (MP3) de la pregunta leída por el tribunal (Amazon Polly). */
+  vozPregunta(preguntaId: number): Observable<Blob> {
+    return this.api.getBlob(`/tribunal/preguntas/${preguntaId}/voz`);
+  }
 }
