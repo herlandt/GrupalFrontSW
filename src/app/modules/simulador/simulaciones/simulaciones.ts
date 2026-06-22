@@ -118,10 +118,15 @@ const NIVELES: NivelDificultad[] = ['EXPLORACION', 'ESTANDAR', 'RIGUROSO'];
         <button
           (click)="iniciar()"
           [disabled]="iniciando() || !versionId()"
-          class="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          class="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {{ iniciando() ? 'Iniciando…' : 'Iniciar simulación' }}
         </button>
+        @if (!iniciando() && !versionId()) {
+          <p class="mt-2 text-xs text-slate-400">
+            Elige un documento y una versión para iniciar la simulación.
+          </p>
+        }
       </div>
 
       <!-- CU-15: historial -->

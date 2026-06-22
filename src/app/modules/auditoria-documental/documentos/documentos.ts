@@ -37,19 +37,31 @@ import { Documento, DocumentosService, VersionDocumento } from './documentos.ser
           placeholder="Título de la tesis"
           class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
-        <input
-          type="file"
-          accept=".pdf,.docx"
-          (change)="onArchivo($event)"
-          class="mb-3 block text-sm"
-        />
+        <!-- Selector de archivo estilizado: el input nativo va OCULTO dentro del label, así
+             el área clicable es clara y se muestra el nombre del archivo elegido. -->
+        <label
+          class="mb-3 flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+        >
+          <span class="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+            Elegir archivo
+          </span>
+          <span class="truncate" [class.text-slate-400]="!archivo()">
+            {{ archivo()?.name ?? 'PDF o DOCX' }}
+          </span>
+          <input type="file" accept=".pdf,.docx" (change)="onArchivo($event)" class="hidden" />
+        </label>
         <button
           (click)="subir()"
           [disabled]="subiendo() || !archivo() || !titulo()"
-          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {{ subiendo() ? 'Subiendo…' : 'Subir documento' }}
         </button>
+        @if (!subiendo() && (!titulo() || !archivo())) {
+          <p class="mt-2 text-xs text-slate-400">
+            Escribe un título y elige un archivo para habilitar el botón.
+          </p>
+        }
       </div>
 
       <!-- CU-11: lista de documentos -->
@@ -125,13 +137,19 @@ import { Documento, DocumentosService, VersionDocumento } from './documentos.ser
                 </tbody>
               </table>
             </div>
-            <!-- CU-09: subir nueva versión -->
-            <input
-              type="file"
-              accept=".pdf,.docx"
-              (change)="onNuevaVersion($event, doc.id)"
-              class="mt-3 block text-xs"
-            />
+            <!-- CU-09: subir nueva versión (selector estilizado, sube al elegir) -->
+            <label
+              class="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+            >
+              <span class="font-medium text-slate-700">Subir nueva versión</span>
+              <span class="text-slate-400">PDF o DOCX</span>
+              <input
+                type="file"
+                accept=".pdf,.docx"
+                (change)="onNuevaVersion($event, doc.id)"
+                class="hidden"
+              />
+            </label>
           }
         </div>
       } @empty {

@@ -50,8 +50,13 @@ import { UsuariosService } from './usuarios.service';
           </form>
 
           <div class="mt-6 border-t border-slate-100 pt-4">
-            <label class="mb-1 block text-sm font-medium text-slate-700">Foto de perfil</label>
-            <input type="file" accept="image/*" (change)="onArchivo($event)" class="text-sm" />
+            <p class="mb-1 text-sm font-medium text-slate-700">Foto de perfil</p>
+            <label
+              class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <span>Cambiar foto…</span>
+              <input type="file" accept="image/*" (change)="onArchivo($event)" class="hidden" />
+            </label>
           </div>
 
           @if (mensaje()) {
