@@ -40,7 +40,7 @@ type Fase =
         autoplay
         playsinline
         muted
-        [hidden]="fase() !== 'grabando'"
+        [hidden]="fase() !== 'listo' && fase() !== 'grabando'"
         class="mx-auto mb-4 w-full max-w-xs rounded-lg border border-slate-200 bg-slate-900"
       ></video>
 
@@ -273,19 +273,27 @@ export class TribunalVoz implements OnDestroy {
   protected reproducir(): void {
     const p = this.preguntaActual();
     if (!p) return;
+    this.video.detener(); // cámara apagada mientras habla el tribunal
     this.fase.set('reproduciendo');
     this.aviso.set(null);
     this.tribunal
       .vozPregunta(p.id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (blob) => this.reproducirBlob(blob, () => this.fase.set('listo')),
+        next: (blob) => this.reproducirBlob(blob, () => this.alListo()),
         // Si la voz falla, igual se puede responder (la pregunta está en pantalla).
         error: () => {
           this.aviso.set('No se pudo reproducir la voz; puedes responder igualmente.');
-          this.fase.set('listo');
+          this.alListo();
         },
       });
+  }
+
+  /** La pregunta terminó: listo para responder; encendemos el preview de la cámara. */
+  private alListo(): void {
+    this.fase.set('listo');
+    const cam = this.cam()?.nativeElement;
+    if (cam) this.video.abrirPreview(cam).catch(() => undefined);
   }
 
   protected async grabar(): Promise<void> {
@@ -295,7 +303,7 @@ export class TribunalVoz implements OnDestroy {
     this.acumulado.set('');
     this.evaluacion.set(null);
     this.aviso.set(null);
-    this.iniciarCamara(); // cámara por WebSocket: mide el contacto visual de la respuesta
+    this.iniciarVideoStream(); // empieza a medir el contacto visual de la respuesta
     try {
       await this.audio.iniciar(
         this.bioSrv.audioWsUrl(this.sesionId),
@@ -314,21 +322,25 @@ export class TribunalVoz implements OnDestroy {
     }
   }
 
-  /** Abre la cámara (WebSocket → Rekognition) y promedia el contacto visual de la respuesta. */
-  private iniciarCamara(): void {
+  /** Transmite frames a Rekognition y promedia el contacto visual de la respuesta en curso. */
+  private iniciarVideoStream(): void {
     this.mirada.set(0);
     this.sumContacto = 0;
     this.nContacto = 0;
     const cam = this.cam()?.nativeElement;
     if (!cam) return;
+    // abrirPreview es idempotente (si ya estaba abierta desde 'listo', no reabre).
     this.video
-      .iniciar(this.bioSrv.videoWsUrl(this.sesionId), cam, (m) => {
-        if (m.contacto_visual != null) {
-          this.sumContacto += m.contacto_visual;
-          this.nContacto += 1;
-          this.mirada.set(Math.round(m.contacto_visual));
-        }
-      })
+      .abrirPreview(cam)
+      .then(() =>
+        this.video.iniciarStream(this.bioSrv.videoWsUrl(this.sesionId), (m) => {
+          if (m.contacto_visual != null) {
+            this.sumContacto += m.contacto_visual;
+            this.nContacto += 1;
+            this.mirada.set(Math.round(m.contacto_visual));
+          }
+        }),
+      )
       .catch(() => {
         /* sin cámara: la respuesta no se penaliza por mirada (atención = null) */
       });

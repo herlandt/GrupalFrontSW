@@ -19,18 +19,28 @@ export class VideoStreamer {
   private cerrando = false;
   private video: HTMLVideoElement | null = null;
 
-  /** Abre cámara + WebSocket. Resuelve cuando el WS está conectado; rechaza si falla. */
+  /** Solo abre la cámara y muestra el preview (sin transmitir todavía). */
+  async abrirPreview(video: HTMLVideoElement): Promise<void> {
+    if (this.stream) return; // ya abierta
+    this.video = video;
+    this.stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = this.stream;
+    await video.play();
+  }
+
+  /** Abre cámara + WebSocket y empieza a transmitir. Resuelve al conectar; rechaza si falla. */
   async iniciar(
     url: string,
     video: HTMLVideoElement,
     onMetrica: (m: VideoMetrica) => void,
   ): Promise<void> {
-    this.cerrando = false;
-    this.video = video;
-    this.stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = this.stream;
-    await video.play();
+    await this.abrirPreview(video);
+    await this.iniciarStream(url, onMetrica);
+  }
 
+  /** Empieza a enviar frames al backend (la cámara ya debe estar abierta con `abrirPreview`). */
+  async iniciarStream(url: string, onMetrica: (m: VideoMetrica) => void): Promise<void> {
+    this.cerrando = false;
     this.ws = new WebSocket(url);
     this.ws.binaryType = 'arraybuffer';
     try {
@@ -40,7 +50,8 @@ export class VideoStreamer {
         ws.onerror = () => reject(new Error('No se pudo conectar el análisis de video.'));
       });
     } catch (e) {
-      this.detener();
+      this.ws?.close();
+      this.ws = null;
       throw e;
     }
 
