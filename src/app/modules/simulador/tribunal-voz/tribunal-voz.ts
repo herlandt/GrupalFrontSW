@@ -1,9 +1,19 @@
-import { Component, DestroyRef, OnDestroy, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  OnDestroy,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { AudioStreamer } from '../biometrico/audio-streamer';
 import { BiometricoService } from '../biometrico/biometrico.service';
+import { VideoStreamer } from '../biometrico/video-streamer';
 import { ResultadoSimulacion, SimulacionesService } from '../simulaciones/simulaciones.service';
 import { Evaluacion, Pregunta, TribunalService } from '../tribunal/tribunal.service';
 
@@ -23,6 +33,16 @@ type Fase =
     <section class="mx-auto max-w-2xl">
       <h2 class="mb-1 text-xl font-semibold text-slate-800">Tribunal por voz</h2>
       <p class="mb-6 text-sm text-slate-500">Defensa #{{ sesionId }}</p>
+
+      <!-- Cámara (WebSocket → Rekognition): mide el contacto visual mientras respondes. -->
+      <video
+        #cam
+        autoplay
+        playsinline
+        muted
+        [hidden]="fase() !== 'grabando'"
+        class="mx-auto mb-4 w-full max-w-xs rounded-lg border border-slate-200 bg-slate-900"
+      ></video>
 
       @if (aviso(); as a) {
         <p class="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{{ a }}</p>
@@ -107,6 +127,17 @@ type Fase =
                     [style.width.%]="nivelAudio()"
                   ></div>
                 </div>
+                @if (mirada() > 0) {
+                  <p
+                    class="mb-2 text-xs font-medium"
+                    [class.text-emerald-700]="mirada() >= 50"
+                    [class.text-amber-700]="mirada() < 50"
+                  >
+                    👁️ Contacto visual: {{ mirada() }}%{{
+                      mirada() < 50 ? ' · mira a la cámara' : ''
+                    }}
+                  </p>
+                }
                 <p
                   class="mb-3 min-h-[2.5rem] rounded-lg bg-slate-50 px-3 py-2 text-sm italic text-slate-600"
                 >
@@ -161,9 +192,13 @@ export class TribunalVoz implements OnDestroy {
   private readonly bioSrv = inject(BiometricoService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly audio = new AudioStreamer();
+  private readonly video = new VideoStreamer();
+  private readonly cam = viewChild<ElementRef<HTMLVideoElement>>('cam');
 
   private audioEl?: HTMLAudioElement;
   private urlActual?: string;
+  private sumContacto = 0; // acumula contacto visual de la respuesta en curso
+  private nContacto = 0;
 
   protected readonly sesionId = Number(this.route.snapshot.queryParamMap.get('sesion'));
   protected readonly preguntas = signal<Pregunta[]>([]);
@@ -174,6 +209,7 @@ export class TribunalVoz implements OnDestroy {
   protected readonly evaluacion = signal<Evaluacion | null>(null);
   protected readonly resultado = signal<ResultadoSimulacion | null>(null);
   protected readonly aviso = signal<string | null>(null);
+  protected readonly mirada = signal(0); // contacto visual en vivo (%) durante la respuesta
 
   protected readonly preguntaActual = computed(() => this.preguntas()[this.idx()] ?? null);
   protected esUltima(): boolean {
@@ -194,6 +230,7 @@ export class TribunalVoz implements OnDestroy {
 
   ngOnDestroy(): void {
     this.audio.detener();
+    this.video.detener();
     this.limpiarAudio();
   }
 
@@ -258,6 +295,7 @@ export class TribunalVoz implements OnDestroy {
     this.acumulado.set('');
     this.evaluacion.set(null);
     this.aviso.set(null);
+    this.iniciarCamara(); // cámara por WebSocket: mide el contacto visual de la respuesta
     try {
       await this.audio.iniciar(
         this.bioSrv.audioWsUrl(this.sesionId),
@@ -271,14 +309,36 @@ export class TribunalVoz implements OnDestroy {
       );
     } catch {
       this.aviso.set('No se pudo acceder al micrófono. Revisa los permisos.');
+      this.video.detener();
       this.fase.set('listo');
     }
+  }
+
+  /** Abre la cámara (WebSocket → Rekognition) y promedia el contacto visual de la respuesta. */
+  private iniciarCamara(): void {
+    this.mirada.set(0);
+    this.sumContacto = 0;
+    this.nContacto = 0;
+    const cam = this.cam()?.nativeElement;
+    if (!cam) return;
+    this.video
+      .iniciar(this.bioSrv.videoWsUrl(this.sesionId), cam, (m) => {
+        if (m.contacto_visual != null) {
+          this.sumContacto += m.contacto_visual;
+          this.nContacto += 1;
+          this.mirada.set(Math.round(m.contacto_visual));
+        }
+      })
+      .catch(() => {
+        /* sin cámara: la respuesta no se penaliza por mirada (atención = null) */
+      });
   }
 
   protected terminar(): void {
     const p = this.preguntaActual();
     if (!p) return;
     this.audio.detener();
+    this.video.detener();
     this.nivelAudio.set(0);
     const texto = this.acumulado().trim();
     if (!texto) {
@@ -286,9 +346,11 @@ export class TribunalVoz implements OnDestroy {
       this.fase.set('listo');
       return;
     }
+    // Contacto visual promedio (0-1) de la respuesta; null si no hubo cámara (no penaliza).
+    const atencion = this.nContacto > 0 ? this.sumContacto / this.nContacto / 100 : null;
     this.fase.set('evaluando');
     this.tribunal
-      .responder(p.id, texto)
+      .responder(p.id, texto, atencion)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (e) => {

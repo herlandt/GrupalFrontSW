@@ -36,11 +36,13 @@ export class TribunalService {
   responder(
     preguntaId: number,
     texto: string | null,
+    atencion?: number | null,
     audioUrl?: string | null,
   ): Observable<Evaluacion> {
     return this.api.post<Evaluacion>(`/tribunal/preguntas/${preguntaId}/respuesta`, {
       texto: texto || null,
       audio_url: audioUrl || null,
+      atencion: atencion ?? null,
     });
   }
 

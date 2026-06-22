@@ -118,7 +118,7 @@ export class Tribunal {
     const texto = this.borrador()[p.id] || null;
     const audioUrl = this.audio()[p.id] || null;
     if (!texto && !audioUrl) return;
-    this.srv.responder(p.id, texto, audioUrl).subscribe({
+    this.srv.responder(p.id, texto, null, audioUrl).subscribe({
       next: (ev) => this.evaluaciones.update((m) => ({ ...m, [p.id]: ev })),
       error: (e) => this.aviso.set(this.mensajeError(e)),
     });
