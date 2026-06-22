@@ -75,6 +75,47 @@ type Formato = 'pdf' | 'excel';
           </div>
         </div>
       </div>
+
+      <h3 class="mb-3 mt-8 text-sm font-semibold text-slate-700">
+        Bitácora del sistema (auditoría)
+      </h3>
+      <div class="rounded-xl border border-slate-200 bg-white p-4">
+        <p class="mb-3 text-sm text-slate-500">
+          Eventos registrados (altas, cambios, pagos, reportes…). Opcional: acota por fechas.
+        </p>
+        <div class="mb-3 grid gap-3 sm:grid-cols-2">
+          <label class="block text-xs text-slate-500">
+            Desde
+            <input
+              type="date"
+              (change)="desde.set($any($event.target).value)"
+              class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block text-xs text-slate-500">
+            Hasta
+            <input
+              type="date"
+              (change)="hasta.set($any($event.target).value)"
+              class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+        <div class="flex gap-2">
+          <button
+            (click)="descargarBitacora('pdf')"
+            class="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+          >
+            PDF
+          </button>
+          <button
+            (click)="descargarBitacora('excel')"
+            class="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500"
+          >
+            Excel
+          </button>
+        </div>
+      </div>
     </section>
   `,
 })
@@ -85,6 +126,8 @@ export class Reportes implements AfterViewInit, OnDestroy {
 
   protected readonly resumen = signal<ResumenReportes | null>(null);
   protected readonly error = signal<string | null>(null);
+  protected readonly desde = signal('');
+  protected readonly hasta = signal('');
 
   constructor() {
     this.srv.resumen().subscribe((r) => {
@@ -131,6 +174,17 @@ export class Reportes implements AfterViewInit, OnDestroy {
     this.srv.pagosPorEstudiante(formato).subscribe({
       next: (b) => this.guardar(b, `pagos_por_estudiante.${this.ext(formato)}`),
       error: () => this.error.set('No se pudo generar el reporte por estudiante.'),
+    });
+  }
+
+  protected descargarBitacora(formato: Formato): void {
+    this.error.set(null);
+    // Rango INCLUSIVO: desde al inicio del día y hasta al final del día elegido.
+    const desde = this.desde() ? `${this.desde()}T00:00:00` : undefined;
+    const hasta = this.hasta() ? `${this.hasta()}T23:59:59` : undefined;
+    this.srv.bitacora(formato, desde, hasta).subscribe({
+      next: (b) => this.guardar(b, `bitacora.${this.ext(formato)}`),
+      error: () => this.error.set('No se pudo generar el reporte de la bitácora.'),
     });
   }
 

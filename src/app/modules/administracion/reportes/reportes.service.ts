@@ -39,6 +39,14 @@ export class ReportesService {
     return this.api.getBlob('/reportes/pagos-por-estudiante', { formato });
   }
 
+  /** Reporte de la bitácora/auditoría (admin); fechas ISO opcionales para acotar el periodo. */
+  bitacora(formato: Formato, desde?: string, hasta?: string): Observable<Blob> {
+    const params: Record<string, string> = { formato };
+    if (desde) params['desde'] = desde;
+    if (hasta) params['hasta'] = hasta;
+    return this.api.getBlob('/reportes/bitacora', params);
+  }
+
   /** Export del propio historial (rol estudiante). */
   miHistorial(formato: Formato): Observable<Blob> {
     return this.api.getBlob('/reportes/mi-historial/export', { formato });
