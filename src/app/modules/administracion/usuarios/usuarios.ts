@@ -59,6 +59,38 @@ import { UsuariosService } from './usuarios.service';
             </label>
           </div>
 
+          <div class="mt-6 border-t border-slate-100 pt-4">
+            <p class="mb-2 text-sm font-medium text-slate-700">Preferencias</p>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="text-xs text-slate-500">
+                Tema
+                <select
+                  (change)="tema.set($any($event.target).value)"
+                  class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="claro" [selected]="tema() === 'claro'">Claro</option>
+                  <option value="oscuro" [selected]="tema() === 'oscuro'">Oscuro</option>
+                </select>
+              </label>
+              <label class="text-xs text-slate-500">
+                Idioma
+                <select
+                  (change)="idioma.set($any($event.target).value)"
+                  class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="es" [selected]="idioma() === 'es'">Español</option>
+                  <option value="en" [selected]="idioma() === 'en'">English</option>
+                </select>
+              </label>
+            </div>
+            <button
+              (click)="guardarPreferencias()"
+              class="mt-3 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Guardar preferencias
+            </button>
+          </div>
+
           @if (mensaje()) {
             <p class="mt-4 text-sm text-emerald-600">{{ mensaje() }}</p>
           }
@@ -88,6 +120,13 @@ export class Usuarios {
     nombre: [this.auth.usuario()?.nombre ?? '', [Validators.required]],
   });
 
+  protected readonly tema = signal<string>(
+    (this.auth.usuario()?.preferencias?.['tema'] as string) ?? 'claro',
+  );
+  protected readonly idioma = signal<string>(
+    (this.auth.usuario()?.preferencias?.['idioma'] as string) ?? 'es',
+  );
+
   guardar(): void {
     if (this.form.invalid) {
       return;
@@ -105,6 +144,22 @@ export class Usuarios {
         this.cargando.set(false);
       },
     });
+  }
+
+  guardarPreferencias(): void {
+    this.mensaje.set(null);
+    this.usuarios
+      .actualizarPerfil(this.form.getRawValue().nombre, {
+        tema: this.tema(),
+        idioma: this.idioma(),
+      })
+      .subscribe({
+        next: (u) => {
+          this.auth.setUsuario(u);
+          this.mensaje.set('Preferencias guardadas.');
+        },
+        error: () => this.mensaje.set('No se pudieron guardar las preferencias.'),
+      });
   }
 
   onArchivo(event: Event): void {

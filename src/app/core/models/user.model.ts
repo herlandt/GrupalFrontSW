@@ -6,5 +6,6 @@ export interface Usuario {
   email: string;
   rol: Rol;
   foto_perfil_url: string | null;
+  preferencias?: Record<string, unknown> | null;
   activo: boolean;
 }

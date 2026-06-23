@@ -74,6 +74,23 @@ type Formato = 'pdf' | 'excel';
             </button>
           </div>
         </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+          <p class="mb-3 font-medium text-slate-800">Progreso de estudiantes</p>
+          <div class="flex gap-2">
+            <button
+              (click)="descargarProgreso('pdf')"
+              class="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+            >
+              PDF
+            </button>
+            <button
+              (click)="descargarProgreso('excel')"
+              class="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-500"
+            >
+              Excel
+            </button>
+          </div>
+        </div>
       </div>
 
       <h3 class="mb-3 mt-8 text-sm font-semibold text-slate-700">
@@ -174,6 +191,14 @@ export class Reportes implements AfterViewInit, OnDestroy {
     this.srv.pagosPorEstudiante(formato).subscribe({
       next: (b) => this.guardar(b, `pagos_por_estudiante.${this.ext(formato)}`),
       error: () => this.error.set('No se pudo generar el reporte por estudiante.'),
+    });
+  }
+
+  protected descargarProgreso(formato: Formato): void {
+    this.error.set(null);
+    this.srv.progresoEstudiantes(formato).subscribe({
+      next: (b) => this.guardar(b, `progreso_estudiantes.${this.ext(formato)}`),
+      error: () => this.error.set('No se pudo generar el reporte de progreso.'),
     });
   }
 

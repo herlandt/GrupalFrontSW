@@ -62,6 +62,12 @@ import { AuthService } from '../../core/services/auth.service';
             class="rounded px-3 py-2 hover:bg-slate-800"
             >Mi perfil</a
           >
+          <a
+            routerLink="/app/administracion/notificaciones"
+            routerLinkActive="bg-slate-700"
+            class="rounded px-3 py-2 hover:bg-slate-800"
+            >Notificaciones</a
+          >
 
           @if (esAdmin()) {
             <a

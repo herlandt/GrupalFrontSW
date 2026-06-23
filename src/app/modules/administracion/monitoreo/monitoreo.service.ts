@@ -24,9 +24,28 @@ export interface AvanceFormal {
   created_at: string;
 }
 
+export interface SesionResumen {
+  id: number;
+  fecha_inicio: string;
+  nivel_dificultad: string;
+  estado: string;
+  nivel_defensa: NivelGeneral | null;
+}
+
+export interface VersionResumen {
+  id: number;
+  numero_version: number;
+  estado_analisis: string;
+  nivel_documento: NivelGeneral | null;
+  resumen: string | null;
+  created_at: string;
+}
+
 export interface EstudianteDetalle {
   estudiante: EstudianteResumen;
   nivel_general: NivelGeneral;
+  simulaciones: SesionResumen[];
+  versiones: VersionResumen[];
   avances: AvanceFormal[];
 }
 
@@ -41,6 +60,11 @@ export class MonitoreoService {
 
   detalle(usuarioId: number): Observable<EstudianteDetalle> {
     return this.api.get<EstudianteDetalle>(`/monitoreo/estudiantes/${usuarioId}`);
+  }
+
+  /** Descarga el reporte PDF del estudiante seleccionado (CU-07). */
+  exportar(usuarioId: number): Observable<Blob> {
+    return this.api.getBlob(`/monitoreo/estudiantes/${usuarioId}/export`);
   }
 
   registrarAvance(usuarioId: number, etapa: string): Observable<AvanceFormal> {

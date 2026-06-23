@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
@@ -11,7 +12,7 @@ import {
 /** Monitoreo de estudiantes y validación de avance formal (CU-07, RF-08, admin). */
 @Component({
   selector: 'app-monitoreo',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, DatePipe],
   template: `
     <section class="grid max-w-5xl gap-6 lg:grid-cols-2">
       <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -41,7 +42,15 @@ import {
 
       @if (detalle(); as d) {
         <div class="rounded-xl border border-slate-200 bg-white p-5">
-          <h3 class="mb-1 text-sm font-semibold text-slate-800">{{ d.estudiante.nombre }}</h3>
+          <div class="mb-1 flex items-start justify-between gap-2">
+            <h3 class="text-sm font-semibold text-slate-800">{{ d.estudiante.nombre }}</h3>
+            <button
+              (click)="exportar(d)"
+              class="shrink-0 rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+            >
+              Exportar PDF
+            </button>
+          </div>
           <p class="mb-4 text-xs text-slate-500">
             {{ d.estudiante.email }} · Nivel general: {{ d.nivel_general }}
           </p>
@@ -90,6 +99,45 @@ import {
               </li>
             }
           </ul>
+
+          <h4 class="mb-2 mt-5 text-xs font-semibold uppercase text-slate-500">Simulaciones</h4>
+          @if (d.simulaciones.length) {
+            <ul class="flex flex-col gap-1 text-sm">
+              @for (s of d.simulaciones; track s.id) {
+                <li class="flex justify-between rounded-lg border border-slate-100 px-3 py-2">
+                  <span class="text-slate-600">{{ s.fecha_inicio | date: 'short' }}</span>
+                  <span class="text-slate-700">{{ s.nivel_dificultad }}</span>
+                  <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                    {{ s.nivel_defensa ?? s.estado }}
+                  </span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="text-xs text-slate-400">Sin simulaciones.</p>
+          }
+
+          <h4 class="mb-2 mt-5 text-xs font-semibold uppercase text-slate-500">
+            Versiones del documento
+          </h4>
+          @if (d.versiones.length) {
+            <ul class="flex flex-col gap-1 text-sm">
+              @for (v of d.versiones; track v.id) {
+                <li class="rounded-lg border border-slate-100 px-3 py-2">
+                  <span class="font-medium text-slate-700">v{{ v.numero_version }}</span>
+                  <span class="text-slate-500">· {{ v.estado_analisis }}</span>
+                  @if (v.nivel_documento) {
+                    <span class="text-slate-500"> · {{ v.nivel_documento }}</span>
+                  }
+                  @if (v.resumen) {
+                    <p class="mt-1 text-xs text-slate-500">{{ v.resumen }}</p>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="text-xs text-slate-400">Sin versiones.</p>
+          }
         </div>
       }
     </section>
@@ -133,5 +181,16 @@ export class Monitoreo {
 
   rechazar(a: AvanceFormal, d: EstudianteDetalle): void {
     this.service.rechazar(a.id).subscribe(() => this.recargar(d.estudiante.id));
+  }
+
+  exportar(d: EstudianteDetalle): void {
+    this.service.exportar(d.estudiante.id).subscribe((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `estudiante_${d.estudiante.id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
   }
 }

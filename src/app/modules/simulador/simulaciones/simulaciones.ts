@@ -138,6 +138,7 @@ const NIVELES: NivelDificultad[] = ['EXPLORACION', 'ESTANDAR', 'RIGUROSO'];
               <th class="px-4 py-3">Inicio</th>
               <th class="px-4 py-3">Nivel</th>
               <th class="px-4 py-3">Estado</th>
+              <th class="px-4 py-3">Resultado</th>
               <th class="px-4 py-3">Acciones</th>
             </tr>
           </thead>
@@ -150,6 +151,17 @@ const NIVELES: NivelDificultad[] = ['EXPLORACION', 'ESTANDAR', 'RIGUROSO'];
                   <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
                     {{ s.estado }}
                   </span>
+                </td>
+                <td class="px-4 py-3">
+                  @if (s.nivel_defensa) {
+                    <span
+                      class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                    >
+                      {{ s.nivel_defensa }}
+                    </span>
+                  } @else {
+                    <span class="text-xs text-slate-400">—</span>
+                  }
                 </td>
                 <td class="space-x-2 px-4 py-3">
                   @if (s.estado === 'EN_CURSO') {
@@ -183,7 +195,7 @@ const NIVELES: NivelDificultad[] = ['EXPLORACION', 'ESTANDAR', 'RIGUROSO'];
               </tr>
             } @empty {
               <tr>
-                <td colspan="4" class="px-4 py-6 text-center text-slate-400">
+                <td colspan="5" class="px-4 py-6 text-center text-slate-400">
                   Aún no has iniciado ninguna simulación.
                 </td>
               </tr>

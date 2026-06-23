@@ -88,6 +88,7 @@ import { Documento, DocumentosService, VersionDocumento } from './documentos.ser
                     <th class="py-2">Versión</th>
                     <th class="py-2">Formato</th>
                     <th class="py-2">Estado</th>
+                    <th class="py-2">Nivel</th>
                     <th class="py-2">Fecha</th>
                     <th class="py-2">Informe</th>
                   </tr>
@@ -98,6 +99,7 @@ import { Documento, DocumentosService, VersionDocumento } from './documentos.ser
                       <td class="py-2">v{{ v.numero_version }}</td>
                       <td class="py-2">{{ v.formato }}</td>
                       <td class="py-2 text-slate-600">{{ v.estado_analisis }}</td>
+                      <td class="py-2 text-slate-600">{{ v.nivel_documento ?? '—' }}</td>
                       <td class="py-2 text-slate-500">{{ v.created_at | date: 'short' }}</td>
                       <td class="py-2">
                         @switch (v.estado_analisis) {
@@ -133,6 +135,13 @@ import { Documento, DocumentosService, VersionDocumento } from './documentos.ser
                         }
                       </td>
                     </tr>
+                    @if (v.resumen) {
+                      <tr>
+                        <td colspan="6" class="pb-2 pl-2 text-xs italic text-slate-500">
+                          {{ v.resumen }}
+                        </td>
+                      </tr>
+                    }
                   }
                 </tbody>
               </table>
@@ -210,7 +219,7 @@ export class Documentos implements OnDestroy {
     this.subiendo.set(true);
     this.srv.subir(this.titulo(), file).subscribe({
       next: () => {
-        this.aviso.set('Documento subido. El análisis quedó en cola (PENDIENTE).');
+        this.aviso.set('Documento subido. El análisis empezó automáticamente.');
         this.titulo.set('');
         this.archivo.set(null);
         this.subiendo.set(false);
@@ -236,7 +245,7 @@ export class Documentos implements OnDestroy {
     if (!file) return;
     this.srv.subirVersion(documentoId, file).subscribe({
       next: () => {
-        this.aviso.set('Nueva versión subida (PENDIENTE de análisis).');
+        this.aviso.set('Nueva versión subida; el análisis empezó automáticamente.');
         this.verVersiones(documentoId);
         this.cargar();
       },

@@ -9,8 +9,10 @@ import { ApiService } from '../../../core/services/api.service';
 export class UsuariosService {
   private readonly api = inject(ApiService);
 
-  actualizarPerfil(nombre: string): Observable<Usuario> {
-    return this.api.patch<Usuario>('/usuarios/me', { nombre });
+  actualizarPerfil(nombre: string, preferencias?: Record<string, unknown>): Observable<Usuario> {
+    const body: Record<string, unknown> = { nombre };
+    if (preferencias !== undefined) body['preferencias'] = preferencias;
+    return this.api.patch<Usuario>('/usuarios/me', body);
   }
 
   subirFoto(file: File): Observable<Usuario> {

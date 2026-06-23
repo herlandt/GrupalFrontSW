@@ -61,6 +61,11 @@ const INTERVALO_MS = 2000; // analiza un frame cada 2 s durante la defensa (cuas
                 <p class="text-slate-800">{{ r.ritmo_wpm_promedio ?? '—' }}</p>
               </div>
             </div>
+            @if (r.sugerencia) {
+              <p class="mt-3 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-800">
+                💡 {{ r.sugerencia }}
+              </p>
+            }
           </div>
         }
 

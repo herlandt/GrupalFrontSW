@@ -55,6 +55,13 @@ export class AuthService {
   }
 
   logout(): void {
+    // CU-01: registra el cierre de sesión en el backend (bitácora) antes de descartar el
+    // token. Con JWT stateless el token se invalida en el cliente; el evento queda auditado.
+    if (this.tokens.get()) {
+      this.api
+        .post('/auth/logout', {})
+        .subscribe({ next: () => undefined, error: () => undefined });
+    }
     this.tokens.clear();
     this._usuario.set(null);
   }

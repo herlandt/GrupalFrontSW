@@ -26,6 +26,7 @@ export interface ResumenBiometrico {
   muletillas_total: number;
   pausas_total: number;
   ritmo_wpm_promedio: number | null;
+  sugerencia: string | null; // CU-14: consejo en vivo (refrescar cada 45-90 s)
 }
 
 /** Métricas biométricas de la simulación — ExpoLens (CU-14, RF-03/04/05). */

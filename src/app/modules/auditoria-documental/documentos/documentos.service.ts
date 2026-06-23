@@ -17,6 +17,9 @@ export interface VersionDocumento {
   archivo_url: string;
   formato: 'DOCX' | 'PDF';
   estado_analisis: 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADO' | 'ERROR';
+  // CU-11: resumen/nivel del análisis (presentes en el historial cuando ya hay resultado).
+  nivel_documento?: 'ALTO' | 'MEDIO' | 'BAJO' | null;
+  resumen?: string | null;
   created_at: string;
 }
 

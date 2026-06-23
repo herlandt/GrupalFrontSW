@@ -5,6 +5,7 @@ import { ApiService } from '../../../core/services/api.service';
 
 export type NivelDificultad = 'EXPLORACION' | 'ESTANDAR' | 'RIGUROSO';
 export type EstadoSesion = 'EN_CURSO' | 'FINALIZADA' | 'CANCELADA';
+export type NivelDefensa = 'ALTO' | 'MEDIO' | 'BAJO';
 
 export interface Sesion {
   id: number;
@@ -12,12 +13,11 @@ export interface Sesion {
   version_documento_id: number;
   nivel_dificultad: NivelDificultad;
   estado: EstadoSesion;
+  nivel_defensa: NivelDefensa | null; // CU-15: resultado general de la sesión
   fecha_inicio: string;
   fecha_fin: string | null;
   created_at: string;
 }
-
-export type NivelDefensa = 'ALTO' | 'MEDIO' | 'BAJO';
 
 export interface ResultadoSimulacion {
   id: number;

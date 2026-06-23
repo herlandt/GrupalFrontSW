@@ -75,6 +75,12 @@ type Fase =
             >
               Volver a mis simulaciones
             </button>
+            <button
+              (click)="descargarInforme()"
+              class="mt-2 block w-full rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Descargar informe (PDF)
+            </button>
           </div>
         }
       } @else if (preguntaActual(); as p) {
@@ -414,6 +420,20 @@ export class TribunalVoz implements OnDestroy {
 
   protected volver(): void {
     this.router.navigate(['/app/simulador']);
+  }
+
+  protected descargarInforme(): void {
+    this.tribunal.informePdf(this.sesionId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `informe_tribunal_${this.sesionId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (e) => this.aviso.set(this.msg(e)),
+    });
   }
 
   private reproducirBlob(blob: Blob, onEnded: () => void): void {

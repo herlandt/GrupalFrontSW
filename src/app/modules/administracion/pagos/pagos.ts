@@ -60,23 +60,67 @@ import { PagoHistorial, PagosService, SuscripcionEstado } from './pagos.service'
         </div>
       }
 
+      <div class="mb-3 mt-8 flex flex-wrap items-end justify-between gap-3">
+        <h3 class="text-sm font-semibold text-slate-700">Historial de pagos</h3>
+        <div class="flex flex-wrap items-end gap-2">
+          <label class="text-xs text-slate-500">
+            Desde
+            <input
+              type="date"
+              (change)="desde.set($any($event.target).value)"
+              class="mt-1 block rounded-lg border border-slate-300 px-2 py-1 text-sm"
+            />
+          </label>
+          <label class="text-xs text-slate-500">
+            Hasta
+            <input
+              type="date"
+              (change)="hasta.set($any($event.target).value)"
+              class="mt-1 block rounded-lg border border-slate-300 px-2 py-1 text-sm"
+            />
+          </label>
+          <label class="text-xs text-slate-500">
+            Estado
+            <select
+              (change)="estado.set($any($event.target).value)"
+              class="mt-1 block rounded-lg border border-slate-300 px-2 py-1 text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="PAGADO">PAGADO</option>
+              <option value="PENDIENTE">PENDIENTE</option>
+              <option value="FALLIDO">FALLIDO</option>
+              <option value="REEMBOLSADO">REEMBOLSADO</option>
+            </select>
+          </label>
+          <button
+            (click)="aplicarFiltros()"
+            class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white hover:bg-slate-800"
+          >
+            Filtrar
+          </button>
+          <button
+            (click)="limpiarFiltros()"
+            class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
       @if (historial().length) {
-        <div class="mb-3 mt-8 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-700">Historial de pagos</h3>
-          <div class="flex gap-2">
-            <button
-              (click)="exportar('pdf')"
-              class="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
-            >
-              PDF
-            </button>
-            <button
-              (click)="exportar('excel')"
-              class="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
-            >
-              Excel
-            </button>
-          </div>
+        <div class="mb-3 flex justify-end gap-2">
+          <button
+            (click)="exportar('pdf')"
+            class="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            PDF
+          </button>
+          <button
+            (click)="exportar('excel')"
+            class="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+          >
+            Excel
+          </button>
         </div>
         <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table class="w-full min-w-[30rem] text-sm">
@@ -99,8 +143,8 @@ import { PagoHistorial, PagosService, SuscripcionEstado } from './pagos.service'
           </table>
         </div>
       } @else {
-        <p class="mt-8 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
-          Aún no tienes pagos registrados.
+        <p class="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
+          No hay pagos para mostrar.
         </p>
       }
     </section>
@@ -117,6 +161,9 @@ export class Pagos {
   protected readonly historial = signal<PagoHistorial[]>([]);
   protected readonly aviso = signal<string | null>(null);
   protected readonly procesando = signal(false);
+  protected readonly desde = signal('');
+  protected readonly hasta = signal('');
+  protected readonly estado = signal('');
 
   constructor() {
     const pago = this.route.snapshot.queryParamMap.get('pago');
@@ -148,7 +195,27 @@ export class Pagos {
   private cargar(): void {
     this.pagosSrv.miSuscripcion().subscribe((s) => this.suscripcion.set(s));
     this.planesSrv.listar().subscribe((p) => this.planes.set(p));
-    this.pagosSrv.historial().subscribe((h) => this.historial.set(h));
+    this.recargarHistorial();
+  }
+
+  private recargarHistorial(): void {
+    // CU-04: filtra por periodo (rango inclusivo del día) y estado.
+    const desde = this.desde() ? `${this.desde()}T00:00:00` : undefined;
+    const hasta = this.hasta() ? `${this.hasta()}T23:59:59` : undefined;
+    this.pagosSrv
+      .historial(desde, hasta, this.estado() || undefined)
+      .subscribe((h) => this.historial.set(h));
+  }
+
+  aplicarFiltros(): void {
+    this.recargarHistorial();
+  }
+
+  limpiarFiltros(): void {
+    this.desde.set('');
+    this.hasta.set('');
+    this.estado.set('');
+    this.recargarHistorial();
   }
 
   pagar(plan: Plan): void {

@@ -13,11 +13,21 @@ export interface Observacion {
   ubicacion: string | null;
 }
 
+export interface Comparacion {
+  version_anterior_id: number;
+  version_anterior_numero: number;
+  nivel_anterior: string;
+  nivel_actual: string;
+  tendencia: 'mejoro' | 'empeoro' | 'igual';
+  features_delta: Record<string, number>;
+}
+
 export interface ResultadoAuditoria {
   id: number;
   version_id: number;
   nivel_documento: 'ALTO' | 'MEDIO' | 'BAJO';
   resumen: string | null;
+  comparacion: Comparacion | null; // CU-09: comparación con la versión anterior
   created_at: string;
   observaciones: Observacion[];
 }

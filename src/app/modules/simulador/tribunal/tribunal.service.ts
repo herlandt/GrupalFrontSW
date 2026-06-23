@@ -54,4 +54,9 @@ export class TribunalService {
   vozPregunta(preguntaId: number): Observable<Blob> {
     return this.api.getBlob(`/tribunal/preguntas/${preguntaId}/voz`);
   }
+
+  /** Informe de evaluación del tribunal de la sesión en PDF (CU-17). */
+  informePdf(sesionId: number): Observable<Blob> {
+    return this.api.getBlob(`/tribunal/sesiones/${sesionId}/informe`);
+  }
 }

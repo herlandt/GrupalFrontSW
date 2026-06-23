@@ -36,7 +36,12 @@ export class PagosService {
     return this.api.post<SuscripcionEstado | null>('/pagos/confirmar', { session_id: sessionId });
   }
 
-  historial(): Observable<PagoHistorial[]> {
-    return this.api.get<PagoHistorial[]>('/pagos/historial');
+  /** Historial del estudiante (CU-04), filtrable por periodo (ISO) y estado. */
+  historial(desde?: string, hasta?: string, estado?: string): Observable<PagoHistorial[]> {
+    const params: Record<string, string> = {};
+    if (desde) params['desde'] = desde;
+    if (hasta) params['hasta'] = hasta;
+    if (estado) params['estado'] = estado;
+    return this.api.get<PagoHistorial[]>('/pagos/historial', params);
   }
 }

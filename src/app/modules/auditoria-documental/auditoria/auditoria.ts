@@ -28,6 +28,26 @@ const CATEGORIAS: Categoria[] = ['COHERENCIA', 'NORMAS', 'SUGERENCIA'];
           <p class="mt-2 text-xs text-slate-400">{{ r.created_at | date: 'medium' }}</p>
         </div>
 
+        @if (r.comparacion; as c) {
+          <div
+            class="mb-5 rounded-xl border p-4"
+            [class.border-emerald-300]="c.tendencia === 'mejoro'"
+            [class.bg-emerald-50]="c.tendencia === 'mejoro'"
+            [class.border-rose-300]="c.tendencia === 'empeoro'"
+            [class.bg-rose-50]="c.tendencia === 'empeoro'"
+            [class.border-slate-200]="c.tendencia === 'igual'"
+            [class.bg-white]="c.tendencia === 'igual'"
+          >
+            <p class="text-sm font-medium text-slate-700">
+              Comparación con la versión anterior (v{{ c.version_anterior_numero }})
+            </p>
+            <p class="mt-1 text-sm text-slate-700">
+              {{ c.nivel_anterior }} → {{ c.nivel_actual }} ·
+              <span class="font-semibold">{{ tendenciaTexto(c.tendencia) }}</span>
+            </p>
+          </div>
+        }
+
         <div class="mb-4 flex flex-wrap gap-2">
           <button
             (click)="filtrar(null)"
@@ -106,5 +126,9 @@ export class Auditoria {
 
   filtrar(c: Categoria | null): void {
     this.filtro.set(c);
+  }
+
+  protected tendenciaTexto(t: 'mejoro' | 'empeoro' | 'igual'): string {
+    return t === 'mejoro' ? 'Mejoró ↑' : t === 'empeoro' ? 'Empeoró ↓' : 'Sin cambios →';
   }
 }

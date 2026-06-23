@@ -9,6 +9,10 @@ export const routes: Routes = [
   },
   { path: 'usuarios', loadComponent: () => import('./usuarios/usuarios').then((m) => m.Usuarios) },
   {
+    path: 'notificaciones',
+    loadComponent: () => import('./notificaciones/notificaciones').then((m) => m.Notificaciones),
+  },
+  {
     path: 'suscripciones',
     canActivate: [roleGuard('ADMINISTRADOR')],
     loadComponent: () => import('./suscripciones/suscripciones').then((m) => m.Suscripciones),

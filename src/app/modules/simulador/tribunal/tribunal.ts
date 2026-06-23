@@ -14,6 +14,15 @@ import { Evaluacion, Pregunta, TribunalService } from './tribunal.service';
         <p class="mb-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700">{{ a }}</p>
       }
 
+      @if (sesionId && preguntas().length) {
+        <button
+          (click)="descargarInforme()"
+          class="mb-4 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          Descargar informe (PDF)
+        </button>
+      }
+
       @if (!sesionId) {
         <p class="text-sm text-slate-500">
           Abre el tribunal desde una sesión de simulación (?sesion=ID).
@@ -120,6 +129,20 @@ export class Tribunal {
     if (!texto && !audioUrl) return;
     this.srv.responder(p.id, texto, null, audioUrl).subscribe({
       next: (ev) => this.evaluaciones.update((m) => ({ ...m, [p.id]: ev })),
+      error: (e) => this.aviso.set(this.mensajeError(e)),
+    });
+  }
+
+  descargarInforme(): void {
+    this.srv.informePdf(this.sesionId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `informe_tribunal_${this.sesionId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
       error: (e) => this.aviso.set(this.mensajeError(e)),
     });
   }

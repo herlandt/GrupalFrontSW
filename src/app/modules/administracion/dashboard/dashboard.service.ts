@@ -14,7 +14,15 @@ export interface DashboardResponse {
 export class DashboardService {
   private readonly api = inject(ApiService);
 
-  obtener(): Observable<DashboardResponse> {
-    return this.api.get<DashboardResponse>('/dashboard');
+  obtener(opts?: {
+    modulo?: string;
+    desde?: string;
+    hasta?: string;
+  }): Observable<DashboardResponse> {
+    const params: Record<string, string> = {};
+    if (opts?.modulo) params['modulo'] = opts.modulo;
+    if (opts?.desde) params['desde'] = opts.desde;
+    if (opts?.hasta) params['hasta'] = opts.hasta;
+    return this.api.get<DashboardResponse>('/dashboard', params);
   }
 }
