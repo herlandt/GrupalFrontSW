@@ -98,6 +98,10 @@ import { PagoHistorial, PagosService, SuscripcionEstado } from './pagos.service'
             </tbody>
           </table>
         </div>
+      } @else {
+        <p class="mt-8 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600">
+          Aún no tienes pagos registrados.
+        </p>
       }
     </section>
   `,
